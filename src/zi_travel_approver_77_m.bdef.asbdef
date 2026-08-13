@@ -1,0 +1,13 @@
+projection;
+strict ( 2 );
+
+define behavior for ZI_TRAVEL_APPROVER_77_M //alias <alias_name>
+{
+
+  use update;
+  use delete;
+
+  use action acceptTravel;
+  use action rejectTravel;
+
+}
