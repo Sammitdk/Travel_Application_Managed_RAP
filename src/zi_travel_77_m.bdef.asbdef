@@ -20,6 +20,7 @@ with additional save
   factory action copytravel [1];
   action ( features : instance ) acceptTravel result [1] $self;
   action ( features : instance ) rejectTravel result [1] $self;
+  action askAI parameter zask_ai_result result [1] zask_ai_result;
 
   validation validateCustomer on save { create; field CustomerId; }
 

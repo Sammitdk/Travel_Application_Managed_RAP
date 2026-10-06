@@ -27,11 +27,14 @@ annotate view ZC_TRAVEL_77_M with
       targetElement: '_booking'
        }]
 
+  @UI.identification: [
+    { type: #FOR_ACTION, dataAction: 'askAI', label: 'Ask AI' }
+  ]
+  @UI.lineItem: [
+    { type: #FOR_ACTION, dataAction: 'askAI', label: 'Ask AI' },
+    { type: #FOR_ACTION, dataAction: 'copytravel', label: 'CopyTravel', position: 10 }
+  ]
 
-  @UI.lineItem: [{ position: 10 } ,
-  { type : #FOR_ACTION, dataAction : 'copytravel', label : 'CopyTravel' } ]
-  @Search.defaultSearchElement: true
-  @UI.identification: [{ position: 10 }]
   TravelId;
   @UI: { lineItem: [{ position: 20 }],
          selectionField: [{ position: 10 }],

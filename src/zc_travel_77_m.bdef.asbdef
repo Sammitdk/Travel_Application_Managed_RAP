@@ -10,6 +10,8 @@ use etag
 
   use action copytravel;
   use association _booking { create; }
+  use action askAI;
+
 }
 
 define behavior for ZC_BOOKING_77_M //alias <alias_name>

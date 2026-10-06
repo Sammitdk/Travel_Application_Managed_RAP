@@ -33,6 +33,8 @@ CLASS lhc_ZI_TRAVEL_77_M DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS validateCustomer FOR VALIDATE ON SAVE
       IMPORTING keys FOR zi_travel_77_m~validateCustomer.
+    METHODS askAI FOR MODIFY
+       keys FOR ACTION zi_travel_77_m~askAI RESULT result.
 
 ENDCLASS.
 
@@ -445,6 +447,99 @@ CLASS lhc_ZI_TRAVEL_77_M IMPLEMENTATION.
                         text = 'Invalid Customer ID' ) ) TO reported-zi_travel_77_m.
       ENDIF.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD askAI.
+
+    TYPES : BEGIN OF ty_msg,
+              role    TYPE string,
+              content TYPE string,
+            END OF ty_msg,
+            BEGIN OF ty_req,
+              model    TYPE string,
+              messages TYPE STANDARD TABLE OF ty_msg WITH EMPTY KEY,
+            END OF ty_req,
+            BEGIN OF ty_message,
+              role    TYPE string,
+              content TYPE string,
+            END OF ty_message,
+            BEGIN OF ty_choice,
+              message TYPE ty_message,
+            END OF ty_choice,
+            BEGIN OF ty_resp,
+              choices TYPE STANDARD TABLE OF ty_choice WITH EMPTY KEY,
+            END OF ty_resp.
+
+    DATA(lv_user_query) = keys[ 1 ]-%param-query.
+
+    READ ENTITIES OF zi_travel_77_m IN LOCAL MODE
+     ENTITY zi_travel_77_m
+     FIELDS ( TravelId AgencyId BeginDate BookingFee CurrencyCode Description
+              TotalPrice OverallStatus )
+     WITH CORRESPONDING #( keys )
+     RESULT DATA(travels).
+
+    IF travels IS NOT INITIAL.
+      DATA(trav) = travels[ 1 ].
+
+      DATA(lv_prompt) =
+        |Booking details: Travel ID { trav-TravelId }, | &&
+        |Agency { trav-AgencyId }, Begin Date { trav-BeginDate }, | &&
+        |Booking Fee { trav-BookingFee } { trav-CurrencyCode }, | &&
+        |Total Price { trav-TotalPrice } { trav-CurrencyCode }, | &&
+        |Description: { trav-Description }, Status: { trav-OverallStatus }.| &&
+        |User question: { lv_user_query }| &&
+        |Answer using only the booking details above and please give anwswer below 124 characters only|.
+
+      DATA(ls_req) = VALUE ty_req(
+       model    = 'deepseek-ai/DeepSeek-V4.1-Flash:novita'
+       messages = VALUE #( ( role = 'user' content = lv_prompt ) ) ).
+
+      DATA(lv_body) = /ui2/cl_json=>serialize(
+                 data = ls_req pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+
+
+      DATA(ls_resp) = VALUE ty_resp( ).
+
+      TRY.
+          DATA(lo_destination) = cl_http_destination_provider=>create_by_url(
+                                    'https://router.huggingface.co/v1/chat/completions' ).
+        CATCH cx_http_dest_provider_error.
+          "handle exception
+      ENDTRY.
+
+      TRY.
+          DATA(lo_client) = cl_web_http_client_manager=>create_by_http_destination( lo_destination ).
+        CATCH cx_web_http_client_error.
+          "handle exception
+      ENDTRY.
+
+
+      lo_client->get_http_request( )->set_content_type( 'application/json' ).
+      lo_client->get_http_request( )->set_text( lv_body ).
+
+      TRY.
+          DATA(lv_resp_text) = lo_client->execute( i_method = if_web_http_client=>post )->get_text( ).
+
+          /ui2/cl_json=>deserialize(
+            EXPORTING json = lv_resp_text
+            CHANGING  data = ls_resp ).
+
+          APPEND VALUE #( %tky = keys[ 1 ]-%tky ) TO result.
+
+          APPEND VALUE #( %tky = keys[ 1 ]-%tky
+                       %msg = new_message_with_text(
+                                  severity = if_abap_behv_message=>severity-success
+                                  text     = ls_resp-choices[ 1 ]-message-content )
+                     ) TO reported-zi_travel_77_m.
+
+        CATCH cx_web_http_client_error cx_web_message_error INTO DATA(lx_error).
+          DATA(lv_msg) = lx_error->get_text( ).
+      ENDTRY.
+
+    ENDIF.
+
 
   ENDMETHOD.
 
